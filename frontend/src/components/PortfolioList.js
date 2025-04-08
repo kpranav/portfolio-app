@@ -14,9 +14,32 @@ import {
   Grid,
   Container,
   Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { createPortfolio, getPortfolios } from '../services/api';
+
+const calculateMetrics = (portfolio) => {
+  // Hardcode NPV values based on portfolio name or ID
+  const npvValues = {
+    'Portfolio 1': 100000000,  // 100M
+    'Portfolio 2': 120000000,  // 120M
+    'Portfolio 3': 140000000   // 140M
+  };
+
+  return {
+    npv: npvValues[portfolio.name] || 0,
+    expectedInbound: 0,
+    expectedOutbound: 0,
+    availableCash: 0
+  };
+};
 
 const PortfolioList = () => {
   const [portfolios, setPortfolios] = useState([]);
@@ -104,6 +127,66 @@ const PortfolioList = () => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Financial Metrics Table */}
+      <Card sx={{ mb: 4, mt: 6, bgcolor: 'background.paper' }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'text.primary' }}>
+            Portfolio Financial Metrics
+          </Typography>
+          <TableContainer component={Paper} sx={{ 
+            bgcolor: 'background.paper',
+            '& .MuiTableCell-root': {
+              color: 'text.primary',
+              borderColor: 'divider'
+            }
+          }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Portfolio Name</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Net Present Value</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Expected Inbound Cashflow</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Expected Outbound Cashflow</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Available Unutilized Cash</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {portfolios.map((portfolio) => {
+                  const metrics = calculateMetrics(portfolio);
+                  return (
+                    <TableRow 
+                      key={portfolio._id}
+                      hover
+                      onClick={() => navigate(`/portfolio/${portfolio._id}`)}
+                      sx={{ 
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover'
+                        }
+                      }}
+                    >
+                      <TableCell>{portfolio.name}</TableCell>
+                      <TableCell align="right">
+                        ${metrics.npv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell align="right">
+                        ${metrics.expectedInbound.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell align="right">
+                        ${metrics.expectedOutbound.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell align="right">
+                        ${metrics.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create New Portfolio</DialogTitle>
