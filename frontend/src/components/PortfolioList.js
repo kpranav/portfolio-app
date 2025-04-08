@@ -27,15 +27,51 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { createPortfolio, getPortfolios } from '../services/api';
 
 const calculateMetrics = (portfolio) => {
-  // Hardcode NPV values based on portfolio name or ID
-  const npvValues = {
-    'Portfolio 1': 100000000,  // 100M
-    'Portfolio 2': 120000000,  // 120M
-    'Portfolio 3': 140000000   // 140M
-  };
+  console.log('Calculating metrics for portfolio:', {
+    name: portfolio.name,
+    assets: portfolio.assets,
+    analysis: portfolio.analysis
+  });
+  
+  // Use the analysis data from the backend if available
+  if (portfolio.analysis) {
+    const metrics = {
+      npv: portfolio.analysis.npv || 0,
+      expectedInbound: portfolio.analysis.expected_inbound || 0,
+      expectedOutbound: portfolio.analysis.expected_outbound || 0,
+      availableCash: portfolio.analysis.available_cash || 0
+    };
+    console.log('Using analysis metrics:', metrics);
+    return metrics;
+  }
 
+  // Fallback to calculating from assets if no analysis data
+  if (portfolio.assets && portfolio.assets.length > 0) {
+    const totalValue = portfolio.assets.reduce((sum, asset) => {
+      const quantity = parseFloat(asset.quantity) || 0;
+      const currentPrice = parseFloat(asset.currentPrice) || 0;
+      const value = quantity * currentPrice;
+      console.log('Asset value calculation:', {
+        symbol: asset.symbol,
+        quantity,
+        currentPrice,
+        value
+      });
+      return sum + value;
+    }, 0);
+
+    console.log('Calculated total value from assets:', totalValue);
+    return {
+      npv: totalValue,
+      expectedInbound: 0,
+      expectedOutbound: 0,
+      availableCash: 0
+    };
+  }
+
+  console.log('No data available, returning zeros');
   return {
-    npv: npvValues[portfolio.name] || 0,
+    npv: 0,
     expectedInbound: 0,
     expectedOutbound: 0,
     availableCash: 0
@@ -158,6 +194,7 @@ const PortfolioList = () => {
               <TableBody>
                 {portfolios.map((portfolio) => {
                   const metrics = calculateMetrics(portfolio);
+                  console.log('Rendering metrics for portfolio:', portfolio.name, metrics);
                   return (
                     <TableRow 
                       key={portfolio._id}
@@ -172,16 +209,16 @@ const PortfolioList = () => {
                     >
                       <TableCell>{portfolio.name}</TableCell>
                       <TableCell align="right">
-                        ${metrics.npv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${(metrics.npv || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell align="right">
-                        ${metrics.expectedInbound.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${(metrics.expectedInbound || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell align="right">
-                        ${metrics.expectedOutbound.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${(metrics.expectedOutbound || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell align="right">
-                        ${metrics.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${(metrics.availableCash || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
                   );

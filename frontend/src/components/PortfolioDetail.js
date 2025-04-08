@@ -65,6 +65,51 @@ const PortfolioDetail = () => {
     purchaseDate: new Date().toISOString().split('T')[0]
   });
 
+  const calculateTotalValue = (assets) => {
+    if (!assets || assets.length === 0) return 0;
+    return assets.reduce((total, asset) => {
+      const quantity = parseFloat(asset.quantity) || 0;
+      const currentPrice = parseFloat(asset.currentPrice) || 0;
+      return total + (quantity * currentPrice);
+    }, 0);
+  };
+
+  const calculateTotalReturn = (assets) => {
+    if (!assets || assets.length === 0) return 0;
+    const totalReturn = assets.reduce((total, asset) => {
+      const quantity = parseFloat(asset.quantity) || 0;
+      const currentPrice = parseFloat(asset.currentPrice) || 0;
+      const purchasePrice = parseFloat(asset.purchasePrice) || 0;
+      if (purchasePrice === 0) return total;
+      const returnPercentage = ((currentPrice - purchasePrice) / purchasePrice) * 100;
+      return total + (returnPercentage * (quantity * purchasePrice));
+    }, 0);
+    
+    const totalInvestment = assets.reduce((total, asset) => {
+      const quantity = parseFloat(asset.quantity) || 0;
+      const purchasePrice = parseFloat(asset.purchasePrice) || 0;
+      return total + (quantity * purchasePrice);
+    }, 0);
+
+    return totalInvestment > 0 ? totalReturn / totalInvestment : 0;
+  };
+
+  const calculateAssetDistribution = (assets) => {
+    if (!assets || assets.length === 0) return [];
+    const totalValue = calculateTotalValue(assets);
+    if (totalValue === 0) return [];
+
+    return assets.map(asset => {
+      const quantity = parseFloat(asset.quantity) || 0;
+      const currentPrice = parseFloat(asset.currentPrice) || 0;
+      const value = quantity * currentPrice;
+      return {
+        symbol: asset.symbol,
+        percentage: (value / totalValue) * 100
+      };
+    });
+  };
+
   const fetchPortfolio = async () => {
     try {
       setError(null);
@@ -240,58 +285,56 @@ const PortfolioDetail = () => {
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                 Portfolio Analysis
               </Typography>
-              {analysis ? (
-                <>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Total Value
-                    </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                      ${(analysis.total_value || 0).toFixed(2)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Total Return
-                    </Typography>
-                    <Typography
-                      variant="h5"
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Total Value
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  ${(analysis?.total_value || calculateTotalValue(portfolio?.assets) || 0).toFixed(2)}
+                </Typography>
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Total Return
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 600,
+                    color: (analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0) >= 0 ? 'success.main' : 'error.main',
+                  }}
+                >
+                  {(analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0) >= 0 ? '+' : ''}
+                  {(analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0).toFixed(2)}%
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Asset Distribution
+                </Typography>
+                {portfolio?.assets?.length > 0 ? (
+                  calculateAssetDistribution(portfolio.assets).map((asset) => (
+                    <Box
+                      key={asset.symbol}
                       sx={{
-                        fontWeight: 600,
-                        color: (analysis.total_return || 0) >= 0 ? 'success.main' : 'error.main',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 1,
                       }}
                     >
-                      {(analysis.total_return || 0) >= 0 ? '+' : ''}
-                      {(analysis.total_return || 0).toFixed(2)}%
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Asset Distribution
-                    </Typography>
-                    {analysis.asset_distribution?.map((asset) => (
-                      <Box
-                        key={asset.symbol}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          mb: 1,
-                        }}
-                      >
-                        <Typography variant="body2">{asset.symbol || 'N/A'}</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {(asset.percentage || 0).toFixed(1)}%
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </>
-              ) : (
-                <Typography color="text.secondary">
-                  No analysis available. Add assets to see portfolio analysis.
-                </Typography>
-              )}
+                      <Typography variant="body2">{asset.symbol || 'N/A'}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {(asset.percentage || 0).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No assets in portfolio
+                  </Typography>
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>

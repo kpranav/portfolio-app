@@ -112,29 +112,47 @@ def analyze_portfolio():
     try:
         data = request.json
         portfolio = data.get('portfolio', [])
+        print(f"Received portfolio data: {portfolio}")
         
         total_value = 0
         asset_distribution = []
         historical_data = {}
         
         for asset in portfolio:
-            symbol = asset['symbol']
-            quantity = asset['quantity']
-            current_price = asset['currentPrice']
+            symbol = asset.get('symbol', '')
+            quantity = float(asset.get('quantity', 0))
+            current_price = float(asset.get('currentPrice', 0))
+            purchase_price = float(asset.get('purchasePrice', 0))
+            
+            print(f"Processing asset: {symbol}, quantity: {quantity}, current_price: {current_price}")
             
             asset_value = quantity * current_price
             total_value += asset_value
             
             # Get historical data
             stock_data = get_asset_data(symbol)
-            if 'historical_data' in stock_data:
-                historical_data[symbol] = stock_data['historical_data']
+            if stock_data.get('is_valid', False):
+                historical_data[symbol] = stock_data.get('historical_data', {})
             
+            if total_value > 0:
+                percentage = (asset_value / total_value) * 100
+            else:
+                percentage = 0
+                
             asset_distribution.append({
                 'symbol': symbol,
                 'value': asset_value,
-                'percentage': (asset_value / total_value) * 100 if total_value > 0 else 0
+                'percentage': percentage
             })
+        
+        print(f"Calculated total value: {total_value}")
+        
+        # Calculate expected cashflows based on NPV
+        expected_inbound = total_value * 0.04
+        expected_outbound = total_value * 0.02
+        
+        print(f"Expected inbound: {expected_inbound}")
+        print(f"Expected outbound: {expected_outbound}")
         
         # Calculate portfolio performance
         performance_data = calculate_performance(historical_data, portfolio)
@@ -142,9 +160,14 @@ def analyze_portfolio():
         return jsonify({
             'total_value': total_value,
             'asset_distribution': asset_distribution,
-            'performance': performance_data
+            'performance': performance_data,
+            'npv': total_value,
+            'expected_inbound': expected_inbound,
+            'expected_outbound': expected_outbound,
+            'available_cash': max(0, expected_inbound - expected_outbound)  # Available cash is the net of inbound and outbound
         })
     except Exception as e:
+        print(f"Error in analyze_portfolio: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def calculate_performance(historical_data, portfolio):
