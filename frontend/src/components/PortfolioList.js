@@ -23,6 +23,7 @@ import {
   Paper,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { createPortfolio, getPortfolios } from '../services/api';
 
 const calculateMetrics = (portfolio) => {
@@ -74,9 +75,12 @@ const PortfolioList = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-          My Portfolios
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <TrendingUpIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+            My Portfolios
+          </Typography>
+        </Box>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
