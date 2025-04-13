@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,19 +13,15 @@ import {
   TextField,
   Grid,
   IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Alert,
   Snackbar,
   Container,
-  Divider,
-  Chip,
 } from '@mui/material';
+import { AgGridReact } from 'ag-grid-react';
+import { ClientSideRowModelModule, ValidationModule } from 'ag-grid-community';
+import { ModuleRegistry } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 import {
   LineChart,
   Line,
@@ -49,12 +45,13 @@ import {
   analyzePortfolio
 } from '../services/api';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+ModuleRegistry.registerModules([ClientSideRowModelModule, ValidationModule]);
 
 const PortfolioDetail = () => {
   const { id: portfolioId } = useParams();
   const navigate = useNavigate();
   const [portfolio, setPortfolio] = useState(null);
+  const [assets, setAssets] = useState([]);
   const [open, setOpen] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
@@ -115,6 +112,7 @@ const PortfolioDetail = () => {
       setError(null);
       const response = await getPortfolio(portfolioId);
       setPortfolio(response.data);
+      setAssets(response.data.assets || []);
     } catch (error) {
       console.error('Error fetching portfolio:', error);
       setError(error.response?.data?.error || 'Failed to fetch portfolio');
@@ -124,7 +122,7 @@ const PortfolioDetail = () => {
   const analyzePortfolioData = async () => {
     try {
       setError(null);
-      const response = await analyzePortfolio(portfolio.assets);
+      const response = await analyzePortfolio(assets);
       setAnalysis(response.data);
     } catch (error) {
       console.error('Error analyzing portfolio:', error);
@@ -137,10 +135,10 @@ const PortfolioDetail = () => {
   }, [portfolioId]);
 
   useEffect(() => {
-    if (portfolio?.assets?.length > 0) {
+    if (assets?.length > 0) {
       analyzePortfolioData();
     }
-  }, [portfolio?.assets]);
+  }, [assets]);
 
   const handleAddAsset = async () => {
     try {
@@ -186,6 +184,86 @@ const PortfolioDetail = () => {
     setError(null);
   };
 
+  const DeleteButtonRenderer = (props) => {
+    const handleClick = () => {
+      handleDeleteAsset(props.data._id);
+    };
+    return (
+      <button
+        onClick={handleClick}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: '#d32f2f'
+        }}
+      >
+        <DeleteIcon />
+      </button>
+    );
+  };
+
+  const columnDefs = useMemo(() => [
+    {
+      headerName: 'Symbol',
+      field: 'symbol',
+      width: 120
+    },
+    {
+      headerName: 'Name',
+      field: 'name',
+      width: 200
+    },
+    {
+      headerName: 'Quantity',
+      field: 'quantity',
+      type: 'numericColumn',
+      width: 120
+    },
+    {
+      headerName: 'Purchase Price',
+      field: 'purchasePrice',
+      type: 'numericColumn',
+      valueFormatter: (params) => `$${params.value.toFixed(2)}`,
+      width: 150
+    },
+    {
+      headerName: 'Current Price',
+      field: 'currentPrice',
+      type: 'numericColumn',
+      valueFormatter: (params) => `$${params.value.toFixed(2)}`,
+      width: 150
+    },
+    {
+      headerName: 'Value',
+      field: 'value',
+      type: 'numericColumn',
+      valueGetter: (params) => {
+        const quantity = params.data.quantity || 0;
+        const currentPrice = params.data.currentPrice || 0;
+        return quantity * currentPrice;
+      },
+      valueFormatter: (params) => `$${params.value.toFixed(2)}`,
+      width: 150
+    },
+    {
+      headerName: 'Actions',
+      field: 'actions',
+      cellRenderer: DeleteButtonRenderer,
+      width: 100
+    }
+  ], []);
+
+  const defaultColDef = useMemo(() => ({
+    sortable: true,
+    filter: true,
+    resizable: true,
+  }), []);
+
+  const frameworkComponents = useMemo(() => ({
+    deleteButtonRenderer: DeleteButtonRenderer
+  }), []);
+
   if (!portfolio) return null;
 
   return (
@@ -227,54 +305,20 @@ const PortfolioDetail = () => {
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                 Assets
               </Typography>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Symbol</TableCell>
-                      <TableCell>Name</TableCell>
-                      <TableCell align="right">Quantity</TableCell>
-                      <TableCell align="right">Purchase Price</TableCell>
-                      <TableCell align="right">Current Price</TableCell>
-                      <TableCell align="right">Value</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {portfolio?.assets?.map((asset) => (
-                      <TableRow key={asset._id}>
-                        <TableCell>
-                          <Chip
-                            label={asset.symbol}
-                            size="small"
-                            sx={{ fontWeight: 600 }}
-                          />
-                        </TableCell>
-                        <TableCell>{asset.name || 'N/A'}</TableCell>
-                        <TableCell align="right">{asset.quantity || 0}</TableCell>
-                        <TableCell align="right">
-                          ${(asset.purchasePrice || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell align="right">
-                          ${(asset.currentPrice || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell align="right">
-                          ${((asset.quantity || 0) * (asset.currentPrice || 0)).toFixed(2)}
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            onClick={() => handleDeleteAsset(asset._id)}
-                            color="error"
-                            size="small"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
+                <AgGridReact
+                  modules={[ClientSideRowModelModule, ValidationModule]}
+                  columnDefs={columnDefs}
+                  rowData={assets}
+                  defaultColDef={defaultColDef}
+                  frameworkComponents={frameworkComponents}
+                  pagination={true}
+                  paginationPageSize={10}
+                  onGridReady={params => {
+                    params.api.sizeColumnsToFit();
+                  }}
+                />
+              </div>
             </CardContent>
           </Card>
         </Grid>
@@ -290,7 +334,7 @@ const PortfolioDetail = () => {
                   Total Value
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  ${(analysis?.total_value || calculateTotalValue(portfolio?.assets) || 0).toFixed(2)}
+                  ${(analysis?.total_value || calculateTotalValue(assets) || 0).toFixed(2)}
                 </Typography>
               </Box>
               <Box sx={{ mb: 2 }}>
@@ -301,19 +345,19 @@ const PortfolioDetail = () => {
                   variant="h5"
                   sx={{
                     fontWeight: 600,
-                    color: (analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0) >= 0 ? 'success.main' : 'error.main',
+                    color: (analysis?.total_return || calculateTotalReturn(assets) || 0) >= 0 ? 'success.main' : 'error.main',
                   }}
                 >
-                  {(analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0) >= 0 ? '+' : ''}
-                  {(analysis?.total_return || calculateTotalReturn(portfolio?.assets) || 0).toFixed(2)}%
+                  {(analysis?.total_return || calculateTotalReturn(assets) || 0) >= 0 ? '+' : ''}
+                  {(analysis?.total_return || calculateTotalReturn(assets) || 0).toFixed(2)}%
                 </Typography>
               </Box>
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   Asset Distribution
                 </Typography>
-                {portfolio?.assets?.length > 0 ? (
-                  calculateAssetDistribution(portfolio.assets).map((asset) => (
+                {assets?.length > 0 ? (
+                  calculateAssetDistribution(assets).map((asset) => (
                     <Box
                       key={asset.symbol}
                       sx={{
