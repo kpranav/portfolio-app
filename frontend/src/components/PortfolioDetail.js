@@ -16,6 +16,7 @@ import {
   Alert,
   Snackbar,
   Container,
+  useTheme,
 } from '@mui/material';
 import { AgGridReact } from 'ag-grid-react';
 import { ClientSideRowModelModule, ValidationModule } from 'ag-grid-community';
@@ -37,12 +38,14 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
 import { 
   getPortfolio, 
   addAsset, 
   deleteAsset,
   getAssetInfo,
-  analyzePortfolio
+  analyzePortfolio,
+  updatePortfolio
 } from '../services/api';
 
 ModuleRegistry.registerModules([ClientSideRowModelModule, ValidationModule]);
@@ -52,15 +55,24 @@ const PortfolioDetail = () => {
   const navigate = useNavigate();
   const [portfolio, setPortfolio] = useState(null);
   const [assets, setAssets] = useState([]);
+  const [gridData, setGridData] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [newName, setNewName] = useState('');
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
+  const [gridApi, setGridApi] = useState(null);
   const [newAsset, setNewAsset] = useState({
     symbol: '',
     quantity: '',
     purchasePrice: '',
     purchaseDate: new Date().toISOString().split('T')[0]
   });
+  const theme = useTheme();
+
+  useEffect(() => {
+    setGridData(assets);
+  }, [assets]);
 
   const calculateTotalValue = (assets) => {
     if (!assets || assets.length === 0) return 0;
@@ -130,6 +142,18 @@ const PortfolioDetail = () => {
     }
   };
 
+  const handleEditName = async () => {
+    try {
+      setError(null);
+      await updatePortfolio(portfolioId, { name: newName });
+      setEditNameOpen(false);
+      fetchPortfolio();
+    } catch (error) {
+      console.error('Error updating portfolio name:', error);
+      setError(error.response?.data?.error || 'Failed to update portfolio name');
+    }
+  };
+
   useEffect(() => {
     fetchPortfolio();
   }, [portfolioId]);
@@ -171,12 +195,17 @@ const PortfolioDetail = () => {
 
   const handleDeleteAsset = async (assetId) => {
     try {
-      setError(null);
       await deleteAsset(portfolioId, assetId);
-      fetchPortfolio();
+      if (gridApi) {
+        const rowNode = gridApi.getRowNode(assetId);
+        if (rowNode) {
+          gridApi.applyTransaction({ remove: [rowNode.data] });
+        }
+      }
+      setAssets(prevAssets => prevAssets.filter(asset => asset._id !== assetId));
     } catch (error) {
       console.error('Error deleting asset:', error);
-      setError(error.response?.data?.error || 'Failed to delete asset');
+      setError('Failed to delete asset');
     }
   };
 
@@ -189,17 +218,13 @@ const PortfolioDetail = () => {
       handleDeleteAsset(props.data._id);
     };
     return (
-      <button
+      <IconButton 
+        size="small" 
         onClick={handleClick}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: '#d32f2f'
-        }}
+        color="error"
       >
         <DeleteIcon />
-      </button>
+      </IconButton>
     );
   };
 
@@ -207,32 +232,42 @@ const PortfolioDetail = () => {
     {
       headerName: 'Symbol',
       field: 'symbol',
-      width: 120
+      width: 120,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Name',
       field: 'name',
-      width: 200
+      width: 200,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Quantity',
       field: 'quantity',
       type: 'numericColumn',
-      width: 120
+      width: 120,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Purchase Price',
       field: 'purchasePrice',
       type: 'numericColumn',
       valueFormatter: (params) => `$${params.value.toFixed(2)}`,
-      width: 150
+      width: 150,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Current Price',
       field: 'currentPrice',
       type: 'numericColumn',
       valueFormatter: (params) => `$${params.value.toFixed(2)}`,
-      width: 150
+      width: 150,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Value',
@@ -244,13 +279,17 @@ const PortfolioDetail = () => {
         return quantity * currentPrice;
       },
       valueFormatter: (params) => `$${params.value.toFixed(2)}`,
-      width: 150
+      width: 150,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-left'
     },
     {
       headerName: 'Actions',
       field: 'actions',
       cellRenderer: DeleteButtonRenderer,
-      width: 100
+      width: 100,
+      headerClass: 'ag-header-cell-center',
+      cellClass: 'ag-cell-center'
     }
   ], []);
 
@@ -284,9 +323,20 @@ const PortfolioDetail = () => {
           <IconButton onClick={() => navigate('/')} sx={{ color: 'text.secondary' }}>
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-            {portfolio.name}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+              {portfolio?.name}
+            </Typography>
+            <IconButton 
+              onClick={() => {
+                setNewName(portfolio?.name || '');
+                setEditNameOpen(true);
+              }}
+              sx={{ color: 'text.secondary' }}
+            >
+              <EditIcon />
+            </IconButton>
+          </Box>
         </Box>
         <Button
           variant="contained"
@@ -305,17 +355,36 @@ const PortfolioDetail = () => {
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                 Assets
               </Typography>
-              <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
+              <div 
+                className="ag-theme-alpine" 
+                style={{ 
+                  height: 400, 
+                  width: '100%',
+                  '--ag-background-color': theme.palette.background.paper,
+                  '--ag-header-background-color': theme.palette.background.paper,
+                  '--ag-odd-row-background-color': theme.palette.background.paper,
+                  '--ag-row-hover-color': theme.palette.action.hover,
+                  '--ag-header-foreground-color': theme.palette.text.primary,
+                  '--ag-foreground-color': theme.palette.text.primary,
+                  '--ag-border-color': theme.palette.divider,
+                  '--ag-row-border-color': theme.palette.divider,
+                  '--ag-header-column-separator-color': theme.palette.divider,
+                  '--ag-header-column-resize-handle-color': theme.palette.divider,
+                  '--ag-selected-row-background-color': theme.palette.action.selected,
+                }}
+              >
                 <AgGridReact
                   modules={[ClientSideRowModelModule, ValidationModule]}
                   columnDefs={columnDefs}
-                  rowData={assets}
+                  rowData={gridData}
                   defaultColDef={defaultColDef}
                   frameworkComponents={frameworkComponents}
                   pagination={true}
                   paginationPageSize={10}
+                  getRowId={params => params.data._id}
                   onGridReady={params => {
-                    params.api.sizeColumnsToFit();
+                    setGridApi(params.api);
+                    params.api.autoSizeAllColumns();
                   }}
                 />
               </div>
@@ -383,6 +452,29 @@ const PortfolioDetail = () => {
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog open={editNameOpen} onClose={() => setEditNameOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Portfolio Name</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Portfolio Name"
+            type="text"
+            fullWidth
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditNameOpen(false)} sx={{ color: 'text.secondary' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleEditName} variant="contained">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add New Asset</DialogTitle>
