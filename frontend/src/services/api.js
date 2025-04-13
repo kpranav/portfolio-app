@@ -1,12 +1,21 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5003/api';
-const PYTHON_API_URL = 'http://localhost:5002/api';
+// Use environment variables for API URLs
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5003/api';
+const PYTHON_API_URL = process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:5002/api';
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 // Portfolio API
 export const getPortfolios = async () => {
   try {
-    const response = await axios.get(`${API_URL}/portfolios`);
+    const response = await api.get('/portfolios');
     console.log('Raw portfolios response:', response.data);
     
     // Get analysis for each portfolio
@@ -45,17 +54,26 @@ export const getPortfolios = async () => {
   }
 };
 
-export const createPortfolio = (portfolio) => axios.post(`${API_URL}/portfolios`, portfolio);
-export const getPortfolio = (id) => axios.get(`${API_URL}/portfolios/${id}`);
-export const deletePortfolio = (id) => axios.delete(`${API_URL}/portfolios/${id}`);
+export const createPortfolio = (portfolio) => api.post('/portfolios', portfolio);
+export const getPortfolio = (id) => api.get(`/portfolios/${id}`);
+export const deletePortfolio = (id) => api.delete(`/portfolios/${id}`);
+export const updatePortfolio = async (portfolioId, data) => {
+  try {
+    const response = await api.put(`/portfolios/${portfolioId}`, data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating portfolio:', error);
+    throw error;
+  }
+};
 
 // Asset API
 export const addAsset = (portfolioId, asset) => 
-  axios.post(`${API_URL}/portfolios/${portfolioId}/assets`, asset);
+  api.post(`/portfolios/${portfolioId}/assets`, asset);
 export const updateAsset = (portfolioId, assetId, asset) => 
-  axios.put(`${API_URL}/portfolios/${portfolioId}/assets/${assetId}`, asset);
+  api.put(`/portfolios/${portfolioId}/assets/${assetId}`, asset);
 export const deleteAsset = (portfolioId, assetId) => 
-  axios.delete(`${API_URL}/portfolios/${portfolioId}/assets/${assetId}`);
+  api.delete(`/portfolios/${portfolioId}/assets/${assetId}`);
 
 // Analysis API
 export const getAssetInfo = (symbol) => 
